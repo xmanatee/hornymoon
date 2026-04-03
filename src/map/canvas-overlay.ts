@@ -10,10 +10,8 @@ const MOON_ALT_FULL_OPACITY = 5 * (Math.PI / 180);
  * Custom Leaflet layer that renders crescent zones on a canvas overlay.
  * Uses direct pixel manipulation via ImageData for performance.
  *
- * Colors:
- * - Blue: lower crescent / wet moon (bright limb down, bowl shape)
- * - Amber: upper crescent (bright limb up, rare)
- * - Dim gray: side crescent (visible but tilted sideways)
+ * Handles world wrapping: detects how many copies of the world are
+ * visible in the viewport and renders the overlay for each copy.
  */
 export class CrescentCanvasLayer extends L.Layer {
   private _canvas: HTMLCanvasElement | null = null;
@@ -60,6 +58,30 @@ export class CrescentCanvasLayer extends L.Layer {
     this._redraw();
   }
 
+  /**
+   * Detect which world-copy longitude offsets are visible in the viewport.
+   * Returns an array of degree offsets (e.g. [0, 360, -360]) to render
+   * the grid at, so the overlay seamlessly wraps around the date line.
+   */
+  private _getWorldCopyOffsets(): number[] {
+    const map = this._map!;
+    const bounds = map.getBounds();
+    const west = bounds.getWest();
+    const east = bounds.getEast();
+
+    const offsets: number[] = [];
+    // Check which 360° world copies overlap the viewport.
+    // Start well below the min possible west, go above max possible east.
+    for (let shift = -1080; shift <= 1080; shift += 360) {
+      const copyWest = -180 + shift;
+      const copyEast = 180 + shift;
+      if (copyEast > west && copyWest < east) {
+        offsets.push(shift);
+      }
+    }
+    return offsets.length > 0 ? offsets : [0];
+  }
+
   private _redraw(): void {
     const map = this._map;
     if (!map || !this._canvas || !this._ctx || !this._gridResult) return;
@@ -80,6 +102,8 @@ export class CrescentCanvasLayer extends L.Layer {
     const imageData = ctx.createImageData(size.x, size.y);
     const data = imageData.data;
 
+    const worldOffsets = this._getWorldCopyOffsets();
+
     for (let row = 0; row < grid.height; row++) {
       for (let col = 0; col < grid.width; col++) {
         const cell = grid.cells[row * grid.width + col];
@@ -87,21 +111,6 @@ export class CrescentCanvasLayer extends L.Layer {
 
         const lat = grid.south + (grid.height - 1 - row) * grid.resolution;
         const lon = grid.west + col * grid.resolution;
-
-        const nw = map.latLngToContainerPoint([
-          lat + grid.resolution / 2,
-          lon - grid.resolution / 2,
-        ]);
-        const se = map.latLngToContainerPoint([
-          lat - grid.resolution / 2,
-          lon + grid.resolution / 2,
-        ]);
-
-        const px0 = Math.max(0, Math.floor(nw.x));
-        const py0 = Math.max(0, Math.floor(nw.y));
-        const px1 = Math.min(size.x - 1, Math.ceil(se.x));
-        const py1 = Math.min(size.y - 1, Math.ceil(se.y));
-        if (px1 < 0 || py1 < 0 || px0 >= size.x || py0 >= size.y) continue;
 
         let r: number, g: number, b: number;
         let alpha: number;
@@ -112,7 +121,6 @@ export class CrescentCanvasLayer extends L.Layer {
         );
 
         if (cell.type === "upper" || cell.type === "lower") {
-          // Horizontal crescent — strong color
           if (cell.type === "upper") {
             r = 255; g = 180; b = 50;
           } else {
@@ -123,7 +131,6 @@ export class CrescentCanvasLayer extends L.Layer {
             Math.max(0, Math.min(255, strength * moonAltFactor * MAX_ALPHA))
           );
         } else {
-          // Side crescent — dim gray to show where the Moon IS visible
           r = 180; g = 180; b = 180;
           alpha = Math.floor(
             Math.max(0, Math.min(255, moonAltFactor * 35))
@@ -133,13 +140,35 @@ export class CrescentCanvasLayer extends L.Layer {
         if (alpha <= 0) continue;
 
         const alphaFrac = alpha / 255;
-        for (let py = py0; py <= py1; py++) {
-          for (let px = px0; px <= px1; px++) {
-            const idx = (py * size.x + px) * 4;
-            data[idx] = Math.min(255, data[idx] + r * alphaFrac);
-            data[idx + 1] = Math.min(255, data[idx + 1] + g * alphaFrac);
-            data[idx + 2] = Math.min(255, data[idx + 2] + b * alphaFrac);
-            data[idx + 3] = Math.min(255, data[idx + 3] + alpha);
+        const halfRes = grid.resolution / 2;
+
+        // Render this cell for each visible world copy
+        for (const offset of worldOffsets) {
+          const shiftedLon = lon + offset;
+
+          const nw = map.latLngToContainerPoint([
+            lat + halfRes,
+            shiftedLon - halfRes,
+          ]);
+          const se = map.latLngToContainerPoint([
+            lat - halfRes,
+            shiftedLon + halfRes,
+          ]);
+
+          const px0 = Math.max(0, Math.floor(nw.x));
+          const py0 = Math.max(0, Math.floor(nw.y));
+          const px1 = Math.min(size.x - 1, Math.ceil(se.x));
+          const py1 = Math.min(size.y - 1, Math.ceil(se.y));
+          if (px1 < 0 || py1 < 0 || px0 >= size.x || py0 >= size.y) continue;
+
+          for (let py = py0; py <= py1; py++) {
+            for (let px = px0; px <= px1; px++) {
+              const idx = (py * size.x + px) * 4;
+              data[idx] = Math.min(255, data[idx] + r * alphaFrac);
+              data[idx + 1] = Math.min(255, data[idx + 1] + g * alphaFrac);
+              data[idx + 2] = Math.min(255, data[idx + 2] + b * alphaFrac);
+              data[idx + 3] = Math.min(255, data[idx + 3] + alpha);
+            }
           }
         }
       }
