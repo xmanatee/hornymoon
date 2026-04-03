@@ -1,0 +1,180 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: #0a0a14;
+  color: #e0e0e0;
+  overflow: hidden;
+}
+
+#map {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+/* Controls panel — top center */
+#controls {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  background: rgba(10, 10, 20, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  padding: 10px 16px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.controls-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
+}
+
+.controls-row + .controls-row {
+  margin-top: 6px;
+}
+
+#controls button {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #e0e0e0;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.15s;
+}
+
+#controls button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+#datetime-input {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #e0e0e0;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 14px;
+  color-scheme: dark;
+}
+
+#phase-display {
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+/* Legend — bottom left */
+#legend {
+  position: absolute;
+  bottom: 24px;
+  left: 12px;
+  z-index: 1000;
+  background: rgba(10, 10, 20, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  padding: 10px 14px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font-size: 13px;
+}
+
+.legend-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.legend-swatch {
+  width: 20px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.legend-upper {
+  background: rgba(255, 180, 50, 0.8);
+}
+
+.legend-lower {
+  background: rgba(80, 160, 255, 0.8);
+}
+
+.legend-fade {
+  background: linear-gradient(to right, rgba(80, 160, 255, 0.8), rgba(80, 160, 255, 0.1));
+}
+
+/* Info panel — bottom right */
+#info-panel {
+  position: absolute;
+  bottom: 24px;
+  right: 12px;
+  z-index: 1000;
+  background: rgba(10, 10, 20, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  padding: 10px 14px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font-size: 13px;
+  display: none;
+  min-width: 200px;
+}
+
+.info-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.info-content div {
+  margin-top: 2px;
+}
+
+/* Leaflet overrides for dark theme */
+.leaflet-control-zoom a {
+  background: rgba(10, 10, 20, 0.9) !important;
+  color: #e0e0e0 !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+.leaflet-control-attribution {
+  background: rgba(10, 10, 20, 0.7) !important;
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.leaflet-control-attribution a {
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+/* Loading indicator */
+.loading-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2000;
+  background: rgba(10, 10, 20, 0.8);
+  border-radius: 8px;
+  padding: 12px 20px;
+  font-size: 14px;
+  pointer-events: none;
+}
