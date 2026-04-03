@@ -2,60 +2,46 @@ import { createMap } from "./map/setup";
 import { CrescentCanvasLayer } from "./map/canvas-overlay";
 import { computeGrid } from "./map/renderer";
 import { createControls, createLegend, createInfoPanel } from "./ui/controls";
-import { computeCrescent } from "./astro/crescent";
-import { sunPosition } from "./astro/sun";
-import { moonPosition } from "./astro/moon";
-import { dateToJD } from "./astro/time";
+import { findNearestCrescentDate } from "./astro/find-crescent";
 
-// State
 let currentDate = new Date();
+let lastZoom = -1;
 let debounceTimer: number | null = null;
 
-// Initialize map
 const map = createMap("map");
 const crescentLayer = new CrescentCanvasLayer();
 crescentLayer.addTo(map);
 
-// Initialize UI
-const controlsContainer = document.getElementById("controls")!;
-const legendContainer = document.getElementById("legend")!;
-const infoContainer = document.getElementById("info-panel")!;
-
-const controls = createControls(controlsContainer, {
+const controls = createControls(document.getElementById("controls")!, {
   onDateChange: (date) => {
     currentDate = date;
-    updateVisualization();
+    recompute();
   },
 });
 
-createLegend(legendContainer);
-const infoPanel = createInfoPanel(infoContainer);
+createLegend(document.getElementById("legend")!);
+const infoPanel = createInfoPanel(document.getElementById("info-panel")!);
 
-// Click-to-inspect
 map.on("click", (e: L.LeafletMouseEvent) => {
-  const { lat, lng } = e.latlng;
-  infoPanel.show(lat, lng, currentDate);
+  infoPanel.show(e.latlng.lat, e.latlng.lng, currentDate);
 });
 
-/**
- * Recompute the grid and update the canvas overlay.
- * Debounced to avoid excessive computation during rapid interaction.
- */
-function updateVisualization(): void {
-  if (debounceTimer !== null) {
-    clearTimeout(debounceTimer);
+map.on("zoomend", () => {
+  const zoom = map.getZoom();
+  if (zoom !== lastZoom) {
+    lastZoom = zoom;
+    recompute();
   }
+});
+
+function recompute(): void {
+  if (debounceTimer !== null) clearTimeout(debounceTimer);
   debounceTimer = window.setTimeout(() => {
-    const zoom = map.getZoom();
-    const grid = computeGrid(currentDate, zoom);
+    const grid = computeGrid(currentDate, map.getZoom());
     crescentLayer.setGridResult(grid);
   }, 100);
 }
 
-// Re-render on map movement
-map.on("moveend zoomend", () => {
-  updateVisualization();
-});
-
-// Initial render with current time
-controls.setDate(currentDate);
+// If today has no visible crescent, jump to the nearest date that does
+const initialDate = findNearestCrescentDate(new Date());
+controls.setDate(initialDate);

@@ -1,9 +1,6 @@
 /** Degrees to radians */
 export const DEG = Math.PI / 180;
 
-/** Radians to degrees */
-export const RAD = 180 / Math.PI;
-
 /** Julian date of J2000.0 epoch (2000 Jan 1.5 TT) */
 export const J2000 = 2451545.0;
 

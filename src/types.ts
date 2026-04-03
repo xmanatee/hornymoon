@@ -10,12 +10,6 @@ export interface Horizontal {
   az: number;
 }
 
-/** Geographic coordinates in degrees */
-export interface GeoPoint {
-  lat: number;
-  lon: number;
-}
-
 /** Result of crescent analysis for a single observer location */
 export interface CrescentInfo {
   /** Crescent tilt angle χ (chi) in radians — 0 = bright limb at top, π = at bottom */

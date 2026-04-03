@@ -29,35 +29,35 @@ export function illuminationFraction(sun: Equatorial, moon: Equatorial): number 
   return (1 - Math.cos(elongation)) / 2;
 }
 
-/** Threshold for crescent visibility (max illumination fraction) */
+/** Max illumination fraction to count as a crescent */
 const MAX_ILLUMINATION = 0.5;
 
-/** Minimum illumination to be visible at all */
+/** Min illumination to be visible at all */
 const MIN_ILLUMINATION = 0.005;
 
-/** Maximum sun altitude (radians) for crescent to be visible — civil twilight */
+/** Max sun altitude (radians) for crescent to be visible — civil twilight */
 const MAX_SUN_ALT = 6 * (Math.PI / 180);
 
-/** Minimum moon altitude (radians) — slightly below horizon for refraction */
+/** Min moon altitude (radians) — slightly below horizon for refraction */
 const MIN_MOON_ALT = -1 * (Math.PI / 180);
 
 /**
  * Threshold angle (radians) for classifying crescent as "upper" or "lower".
- * |sin(tilt)| < sin(threshold) → horizontal crescent.
- * 30° is a generous zone that captures the visually noticeable effect.
+ * |sin(tilt)| < sin(threshold) means the crescent is near-horizontal.
+ * 30 degrees captures the visually noticeable effect.
  */
-const TILT_THRESHOLD = 30 * (Math.PI / 180);
+export const TILT_THRESHOLD_RAD = 30 * (Math.PI / 180);
 
 /**
  * Compute crescent information for a single observer location.
  *
- * The key insight: the crescent tilt angle χ = PA - q, where:
+ * The crescent tilt angle chi = PA - q, where:
  * - PA is the position angle of the bright limb (Sun direction from Moon)
  * - q is the parallactic angle (how celestial north is tilted from zenith)
  *
- * When χ ≈ 0 or 2π, the bright limb faces upward → "upper crescent"
- * When χ ≈ π, the bright limb faces downward → "lower crescent" (wet moon / bowl)
- * When χ ≈ π/2 or 3π/2, it's a standard sideways crescent
+ * chi ~ 0: bright limb faces upward -> "upper crescent"
+ * chi ~ pi: bright limb faces downward -> "lower crescent" (wet moon)
+ * chi ~ pi/2 or 3pi/2: standard sideways crescent
  */
 export function computeCrescent(
   sun: Equatorial,
@@ -67,65 +67,32 @@ export function computeCrescent(
   lon: number
 ): CrescentInfo {
   const moonHoriz = equatorialToHorizontal(moon, jd, lat, lon);
-
-  // Quick check: Moon below horizon → invisible
-  if (moonHoriz.alt < MIN_MOON_ALT) {
-    return {
-      tilt: 0,
-      verticality: 0,
-      moonAlt: moonHoriz.alt,
-      sunAlt: 0,
-      illumination: 0,
-      type: "invisible",
-    };
-  }
-
   const sunHoriz = equatorialToHorizontal(sun, jd, lat, lon);
-
-  // Check sun altitude — crescent only visible during twilight or night
-  if (sunHoriz.alt > MAX_SUN_ALT) {
-    return {
-      tilt: 0,
-      verticality: 0,
-      moonAlt: moonHoriz.alt,
-      sunAlt: sunHoriz.alt,
-      illumination: 0,
-      type: "invisible",
-    };
-  }
-
   const illum = illuminationFraction(sun, moon);
 
-  // Check illumination — must be in crescent phase
-  if (illum < MIN_ILLUMINATION || illum > MAX_ILLUMINATION) {
-    return {
-      tilt: 0,
-      verticality: 0,
-      moonAlt: moonHoriz.alt,
-      sunAlt: sunHoriz.alt,
-      illumination: illum,
-      type: "invisible",
-    };
-  }
+  const invisible: CrescentInfo = {
+    tilt: 0,
+    verticality: 0,
+    moonAlt: moonHoriz.alt,
+    sunAlt: sunHoriz.alt,
+    illumination: illum,
+    type: "invisible",
+  };
 
-  // Position angle of bright limb (celestial frame)
+  if (moonHoriz.alt < MIN_MOON_ALT) return invisible;
+  if (sunHoriz.alt > MAX_SUN_ALT) return invisible;
+  if (illum < MIN_ILLUMINATION || illum > MAX_ILLUMINATION) return invisible;
+
   const PA = brightLimbPA(sun, moon);
-
-  // Parallactic angle at the Moon's position
   const q = parallacticAngle(moon, jd, lat, lon);
-
-  // Crescent tilt: angle of bright limb relative to local zenith
   const chi = PA - q;
 
-  // sin(χ) measures how "sideways" the crescent is
-  // 0 = perfectly vertical (upper or lower), ±1 = perfectly sideways
   const sinChi = Math.sin(chi);
   const cosChi = Math.cos(chi);
-  const verticality = Math.abs(sinChi); // 0 = horizontal crescent, 1 = vertical
+  const verticality = Math.abs(sinChi);
 
   let type: CrescentInfo["type"];
-  if (verticality < Math.sin(TILT_THRESHOLD)) {
-    // Crescent is near horizontal — classify as upper or lower
+  if (verticality < Math.sin(TILT_THRESHOLD_RAD)) {
     type = cosChi > 0 ? "upper" : "lower";
   } else {
     type = "side";
