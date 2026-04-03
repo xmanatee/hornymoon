@@ -7,217 +7,163 @@ export interface TimelineCallbacks {
   onDateChange: (date: Date) => void;
 }
 
+const TOTAL_DAYS = 60;
+const PX_PER_HOUR = 8;
+const HOURS = TOTAL_DAYS * 24;
+const STRIP_WIDTH = HOURS * PX_PER_HOUR;
+
 /**
- * A draggable timeline bar at the bottom of the screen.
- * Spans 30 days centered on the given initial date.
- * Shows moon phase curve and day markers.
- * Supports mouse and touch drag for continuous scrubbing.
+ * Horizontally scrollable timeline strip.
+ * The strip is much wider than the viewport — scroll left/right to move through time.
+ * A fixed center cursor marks the selected time.
  */
 export function createTimeline(
   container: HTMLElement,
   callbacks: TimelineCallbacks
-): { setDate: (d: Date) => void; getRange: () => { start: Date; end: Date } } {
-  const TOTAL_DAYS = 30;
-  const HOURS_PER_DAY = 24;
-  const TOTAL_HOURS = TOTAL_DAYS * HOURS_PER_DAY;
-
+): { setDate: (d: Date) => void } {
   let rangeStart: Date;
   let currentDate: Date;
+  let suppressScrollHandler = false;
 
   container.innerHTML = `
-    <canvas id="timeline-canvas"></canvas>
-    <div id="timeline-cursor"></div>
-    <div id="timeline-date-label"></div>
+    <div class="tl-scroll">
+      <canvas class="tl-canvas"></canvas>
+    </div>
+    <div class="tl-cursor"></div>
+    <div class="tl-label"></div>
   `;
 
-  const canvas = container.querySelector("#timeline-canvas") as HTMLCanvasElement;
-  const cursor = container.querySelector("#timeline-cursor") as HTMLElement;
-  const dateLabel = container.querySelector("#timeline-date-label") as HTMLElement;
+  const scrollEl = container.querySelector(".tl-scroll") as HTMLElement;
+  const canvas = container.querySelector(".tl-canvas") as HTMLCanvasElement;
+  const label = container.querySelector(".tl-label") as HTMLElement;
   const ctx = canvas.getContext("2d")!;
-
-  let isDragging = false;
-
-  function setRange(centerDate: Date): void {
-    rangeStart = new Date(
-      centerDate.getTime() - (TOTAL_DAYS / 2) * 86400_000
-    );
-  }
 
   function setDate(d: Date): void {
     currentDate = d;
-    setRange(d);
-    drawTimeline();
-    updateCursor();
+    rangeStart = new Date(d.getTime() - (TOTAL_DAYS / 2) * 86400_000);
+    drawStrip();
+    scrollToDate(d);
+    updateLabel();
   }
 
-  function hourToX(hour: number): number {
-    return (hour / TOTAL_HOURS) * canvas.width;
-  }
-
-  function xToHour(x: number): number {
-    return Math.round((x / canvas.width) * TOTAL_HOURS);
-  }
-
-  function drawTimeline(): void {
-    const rect = container.getBoundingClientRect();
+  function drawStrip(): void {
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    canvas.style.width = rect.width + "px";
-    canvas.style.height = rect.height + "px";
+    const h = container.getBoundingClientRect().height;
+    canvas.width = STRIP_WIDTH * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = STRIP_WIDTH + "px";
+    canvas.style.height = h + "px";
     ctx.scale(dpr, dpr);
 
-    const w = rect.width;
-    const h = rect.height;
+    ctx.fillStyle = "#0a0a14";
+    ctx.fillRect(0, 0, STRIP_WIDTH, h);
 
-    ctx.clearRect(0, 0, w, h);
+    // Illumination curve (precompute at 6-hour steps for speed)
+    const curveY0 = h * 0.25;
+    const curveH = h * 0.35;
 
-    // Background
-    ctx.fillStyle = "rgba(10, 10, 20, 0.95)";
-    ctx.fillRect(0, 0, w, h);
-
-    // Draw illumination curve and crescent-availability indicator
-    const phaseY = h * 0.35;
-    const phaseH = h * 0.25;
-
-    ctx.beginPath();
-    for (let hour = 0; hour <= TOTAL_HOURS; hour += 2) {
-      const date = new Date(rangeStart.getTime() + hour * 3600_000);
-      const jd = dateToJD(date);
-      const sun = sunPosition(jd);
-      const moon = moonPosition(jd);
-      const illum = illuminationFraction(sun, moon);
-
-      const x = (hour / TOTAL_HOURS) * w;
-      const y = phaseY + phaseH * (1 - illum);
-
-      if (hour === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    // Shade the crescent zone (illumination 0.5% to 40%)
-    for (let hour = 0; hour < TOTAL_HOURS; hour += 2) {
-      const date = new Date(rangeStart.getTime() + hour * 3600_000);
-      const jd = dateToJD(date);
-      const sun = sunPosition(jd);
-      const moon = moonPosition(jd);
-      const illum = illuminationFraction(sun, moon);
-
-      if (illum >= 0.005 && illum <= 0.4) {
-        const x = (hour / TOTAL_HOURS) * w;
-        const xEnd = ((hour + 2) / TOTAL_HOURS) * w;
-        ctx.fillStyle = "rgba(80, 160, 255, 0.15)";
-        ctx.fillRect(x, 0, xEnd - x, h);
+    // Background shading for crescent-phase regions
+    for (let hr = 0; hr < HOURS; hr += 4) {
+      const d = new Date(rangeStart.getTime() + hr * 3600_000);
+      const jd = dateToJD(d);
+      const illum = illuminationFraction(sunPosition(jd), moonPosition(jd));
+      if (illum >= 0.005 && illum <= 0.45) {
+        const x = hr * PX_PER_HOUR;
+        ctx.fillStyle = "rgba(80, 160, 255, 0.12)";
+        ctx.fillRect(x, 0, 4 * PX_PER_HOUR, h);
       }
     }
 
-    // Day markers and labels
-    for (let day = 0; day <= TOTAL_DAYS; day++) {
-      const x = (day / TOTAL_DAYS) * w;
-      const date = new Date(rangeStart.getTime() + day * 86400_000);
-      const dayNum = date.getUTCDate();
+    // Illumination curve
+    ctx.beginPath();
+    for (let hr = 0; hr <= HOURS; hr += 3) {
+      const d = new Date(rangeStart.getTime() + hr * 3600_000);
+      const jd = dateToJD(d);
+      const illum = illuminationFraction(sunPosition(jd), moonPosition(jd));
+      const x = hr * PX_PER_HOUR;
+      const y = curveY0 + curveH * (1 - illum);
+      if (hr === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
 
-      ctx.strokeStyle =
-        dayNum === 1
-          ? "rgba(255,255,255,0.4)"
-          : "rgba(255,255,255,0.12)";
-      ctx.lineWidth = dayNum === 1 ? 1.5 : 0.5;
+    // Day markers
+    for (let day = 0; day <= TOTAL_DAYS; day++) {
+      const x = day * 24 * PX_PER_HOUR;
+      const d = new Date(rangeStart.getTime() + day * 86400_000);
+      const dayNum = d.getUTCDate();
+
+      ctx.strokeStyle = dayNum === 1
+        ? "rgba(255,255,255,0.35)"
+        : "rgba(255,255,255,0.08)";
+      ctx.lineWidth = dayNum === 1 ? 1 : 0.5;
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, h);
       ctx.stroke();
 
-      // Date labels every 5 days or on the 1st
-      if (day % 5 === 0 || dayNum === 1) {
-        const months = [
-          "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-          "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-        ];
-        const label =
-          dayNum === 1
-            ? months[date.getUTCMonth()]
-            : String(dayNum);
-        ctx.fillStyle = "rgba(255,255,255,0.5)";
-        ctx.font = "10px system-ui, sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText(label, x, h - 4);
+      // Labels
+      const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      let text: string;
+      if (dayNum === 1) {
+        text = months[d.getUTCMonth()];
+      } else if (day % 3 === 0) {
+        text = String(dayNum);
+      } else {
+        continue;
       }
+      ctx.fillStyle = dayNum === 1
+        ? "rgba(255,255,255,0.6)"
+        : "rgba(255,255,255,0.35)";
+      ctx.font = `${dayNum === 1 ? 11 : 10}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.fillText(text, x, h - 3);
     }
   }
 
-  function updateCursor(): void {
-    if (!currentDate || !rangeStart) return;
-    const hoursOffset =
-      (currentDate.getTime() - rangeStart.getTime()) / 3600_000;
-    const fraction = hoursOffset / TOTAL_HOURS;
-    const pct = Math.max(0, Math.min(100, fraction * 100));
-    cursor.style.left = pct + "%";
+  function scrollToDate(d: Date): void {
+    const hoursFromStart = (d.getTime() - rangeStart.getTime()) / 3600_000;
+    const targetX = hoursFromStart * PX_PER_HOUR;
+    const viewW = scrollEl.clientWidth;
+    suppressScrollHandler = true;
+    scrollEl.scrollLeft = targetX - viewW / 2;
+    requestAnimationFrame(() => { suppressScrollHandler = false; });
+  }
 
+  function dateFromScroll(): Date {
+    const viewW = scrollEl.clientWidth;
+    const centerX = scrollEl.scrollLeft + viewW / 2;
+    const hours = centerX / PX_PER_HOUR;
+    return new Date(rangeStart.getTime() + hours * 3600_000);
+  }
+
+  function updateLabel(): void {
+    if (!currentDate) return;
     const pad = (n: number) => String(n).padStart(2, "0");
-    dateLabel.textContent = `${currentDate.getUTCFullYear()}-${pad(currentDate.getUTCMonth() + 1)}-${pad(currentDate.getUTCDate())} ${pad(currentDate.getUTCHours())}:${pad(currentDate.getUTCMinutes())} UTC`;
-    dateLabel.style.left = Math.max(5, Math.min(95, pct)) + "%";
+    const d = currentDate;
+    label.textContent =
+      `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}  ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} UTC`;
   }
 
-  function handlePointer(clientX: number): void {
-    const rect = container.getBoundingClientRect();
-    const x = clientX - rect.left;
-    const fraction = Math.max(0, Math.min(1, x / rect.width));
-    const hours = Math.round(fraction * TOTAL_HOURS);
-    const newDate = new Date(rangeStart.getTime() + hours * 3600_000);
-    currentDate = newDate;
-    updateCursor();
-    callbacks.onDateChange(newDate);
-  }
+  // On scroll → update date
+  scrollEl.addEventListener("scroll", () => {
+    if (suppressScrollHandler) return;
+    currentDate = dateFromScroll();
+    updateLabel();
+    callbacks.onDateChange(currentDate);
+  }, { passive: true });
 
-  // Mouse events
-  container.addEventListener("mousedown", (e) => {
-    isDragging = true;
-    handlePointer(e.clientX);
-    e.preventDefault();
-  });
-  window.addEventListener("mousemove", (e) => {
-    if (isDragging) handlePointer(e.clientX);
-  });
-  window.addEventListener("mouseup", () => {
-    isDragging = false;
-  });
-
-  // Touch events
-  container.addEventListener(
-    "touchstart",
-    (e) => {
-      isDragging = true;
-      handlePointer(e.touches[0].clientX);
-      e.preventDefault();
-    },
-    { passive: false }
-  );
-  window.addEventListener(
-    "touchmove",
-    (e) => {
-      if (isDragging) handlePointer(e.touches[0].clientX);
-    },
-    { passive: true }
-  );
-  window.addEventListener("touchend", () => {
-    isDragging = false;
-  });
-
-  // Resize handling
-  let resizeTimer: number | null = null;
+  // Redraw on resize
+  let resizeRaf: number | null = null;
   window.addEventListener("resize", () => {
-    if (resizeTimer) clearTimeout(resizeTimer);
-    resizeTimer = window.setTimeout(() => drawTimeline(), 150);
+    if (resizeRaf) cancelAnimationFrame(resizeRaf);
+    resizeRaf = requestAnimationFrame(() => {
+      drawStrip();
+      if (currentDate) scrollToDate(currentDate);
+    });
   });
 
-  return {
-    setDate,
-    getRange: () => ({
-      start: rangeStart,
-      end: new Date(rangeStart.getTime() + TOTAL_DAYS * 86400_000),
-    }),
-  };
+  return { setDate };
 }
