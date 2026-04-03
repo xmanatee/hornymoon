@@ -13,7 +13,7 @@ export interface ControlsCallbacks {
 export function createControls(
   container: HTMLElement,
   callbacks: ControlsCallbacks
-): { setDate: (d: Date) => void } {
+): { setDate: (d: Date) => void; setDateSilent: (d: Date) => void } {
   container.innerHTML = `
     <div class="controls-row">
       <button id="btn-back-day" title="−1 day">◀◀</button>
@@ -91,7 +91,14 @@ export function createControls(
     }
   });
 
-  return { setDate };
+  function setDateSilent(d: Date): void {
+    currentDate = d;
+    const pad = (n: number) => String(n).padStart(2, "0");
+    input.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    updatePhaseDisplay();
+  }
+
+  return { setDate, setDateSilent };
 }
 
 /**
@@ -101,16 +108,16 @@ export function createLegend(container: HTMLElement): void {
   container.innerHTML = `
     <div class="legend-title">Crescent Orientation</div>
     <div class="legend-item">
-      <span class="legend-swatch legend-upper"></span>
-      <span>Upper crescent (bright limb up) ☽̃</span>
+      <span class="legend-swatch legend-lower"></span>
+      <span>Horizontal crescent — "wet moon" ☽</span>
     </div>
     <div class="legend-item">
-      <span class="legend-swatch legend-lower"></span>
-      <span>Lower crescent — "wet moon" (bright limb down) ☽</span>
+      <span class="legend-swatch legend-side"></span>
+      <span>Side crescent (Moon visible, tilted)</span>
     </div>
     <div class="legend-item">
       <span class="legend-swatch legend-fade"></span>
-      <span>Gradient = certainty (solid → edge of zone)</span>
+      <span>Opacity = how horizontal</span>
     </div>
   `;
 }

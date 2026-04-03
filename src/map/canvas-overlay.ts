@@ -3,12 +3,17 @@ import { TILT_THRESHOLD_RAD } from "../astro/crescent";
 import type { GridResult } from "../types";
 
 const TILT_THRESHOLD_SIN = Math.sin(TILT_THRESHOLD_RAD);
-const MAX_ALPHA = 180;
-const MOON_ALT_FULL_OPACITY = 10 * (Math.PI / 180);
+const MAX_ALPHA = 200;
+const MOON_ALT_FULL_OPACITY = 5 * (Math.PI / 180);
 
 /**
  * Custom Leaflet layer that renders crescent zones on a canvas overlay.
  * Uses direct pixel manipulation via ImageData for performance.
+ *
+ * Colors:
+ * - Blue: lower crescent / wet moon (bright limb down, bowl shape)
+ * - Amber: upper crescent (bright limb up, rare)
+ * - Dim gray: side crescent (visible but tilted sideways)
  */
 export class CrescentCanvasLayer extends L.Layer {
   private _canvas: HTMLCanvasElement | null = null;
@@ -78,7 +83,7 @@ export class CrescentCanvasLayer extends L.Layer {
     for (let row = 0; row < grid.height; row++) {
       for (let col = 0; col < grid.width; col++) {
         const cell = grid.cells[row * grid.width + col];
-        if (cell.type === "invisible" || cell.type === "side") continue;
+        if (cell.type === "invisible") continue;
 
         const lat = grid.south + (grid.height - 1 - row) * grid.resolution;
         const lon = grid.west + col * grid.resolution;
@@ -98,15 +103,33 @@ export class CrescentCanvasLayer extends L.Layer {
         const py1 = Math.min(size.y - 1, Math.ceil(se.y));
         if (px1 < 0 || py1 < 0 || px0 >= size.x || py0 >= size.y) continue;
 
-        // Upper crescent: warm amber. Lower crescent (wet moon): cool blue.
-        const [r, g, b] =
-          cell.type === "upper" ? [255, 180, 50] : [80, 160, 255];
+        let r: number, g: number, b: number;
+        let alpha: number;
 
-        const strength = 1 - cell.verticality / TILT_THRESHOLD_SIN;
-        const moonAltFactor = Math.min(1, cell.moonAlt / MOON_ALT_FULL_OPACITY);
-        const alpha = Math.floor(
-          Math.max(0, Math.min(255, strength * moonAltFactor * MAX_ALPHA))
+        const moonAltFactor = Math.max(
+          0,
+          Math.min(1, cell.moonAlt / MOON_ALT_FULL_OPACITY)
         );
+
+        if (cell.type === "upper" || cell.type === "lower") {
+          // Horizontal crescent — strong color
+          if (cell.type === "upper") {
+            r = 255; g = 180; b = 50;
+          } else {
+            r = 80; g = 160; b = 255;
+          }
+          const strength = 1 - cell.verticality / TILT_THRESHOLD_SIN;
+          alpha = Math.floor(
+            Math.max(0, Math.min(255, strength * moonAltFactor * MAX_ALPHA))
+          );
+        } else {
+          // Side crescent — dim gray to show where the Moon IS visible
+          r = 180; g = 180; b = 180;
+          alpha = Math.floor(
+            Math.max(0, Math.min(255, moonAltFactor * 35))
+          );
+        }
+
         if (alpha <= 0) continue;
 
         const alphaFrac = alpha / 255;

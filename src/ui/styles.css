@@ -20,7 +20,7 @@ html, body {
   top: 0;
   left: 0;
   width: 100%;
-  height: 100%;
+  height: calc(100% - 64px);
   z-index: 1;
 }
 
@@ -97,10 +97,10 @@ html, body {
   white-space: nowrap;
 }
 
-/* Legend — bottom left */
+/* Legend — bottom left, above timeline */
 #legend {
   position: absolute;
-  bottom: max(24px, env(safe-area-inset-bottom, 24px));
+  bottom: max(76px, calc(64px + env(safe-area-inset-bottom, 12px)));
   left: max(12px, env(safe-area-inset-left, 12px));
   z-index: 1000;
   background: rgba(10, 10, 20, 0.92);
@@ -141,14 +141,18 @@ html, body {
   background: rgba(80, 160, 255, 0.8);
 }
 
+.legend-side {
+  background: rgba(180, 180, 180, 0.3);
+}
+
 .legend-fade {
   background: linear-gradient(to right, rgba(80, 160, 255, 0.8), rgba(80, 160, 255, 0.1));
 }
 
-/* Info panel — bottom right */
+/* Info panel — bottom right, above timeline */
 #info-panel {
   position: absolute;
-  bottom: max(24px, env(safe-area-inset-bottom, 24px));
+  bottom: max(76px, calc(64px + env(safe-area-inset-bottom, 12px)));
   right: max(12px, env(safe-area-inset-right, 12px));
   z-index: 1000;
   background: rgba(10, 10, 20, 0.92);
@@ -206,6 +210,63 @@ html, body {
   color: rgba(255, 255, 255, 0.6) !important;
 }
 
+/* Timeline bar — bottom of screen */
+#timeline {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 64px;
+  z-index: 1000;
+  cursor: ew-resize;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#timeline-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+#timeline-cursor {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background: #fff;
+  transform: translateX(-50%);
+  pointer-events: none;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.5);
+}
+
+#timeline-cursor::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 10px;
+  height: 10px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.6);
+}
+
+#timeline-date-label {
+  position: absolute;
+  top: 2px;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
 /* ---- Mobile responsive ---- */
 @media (max-width: 600px) {
   #controls {
@@ -228,8 +289,16 @@ html, body {
     max-width: 160px;
   }
 
+  #timeline {
+    height: 52px;
+  }
+
+  #map {
+    height: calc(100% - 52px);
+  }
+
   #legend {
-    bottom: max(12px, env(safe-area-inset-bottom, 12px));
+    bottom: max(62px, calc(52px + env(safe-area-inset-bottom, 8px)));
     left: max(8px, env(safe-area-inset-left, 8px));
     padding: 8px 10px;
     font-size: 11px;
@@ -241,8 +310,7 @@ html, body {
   }
 
   #info-panel {
-    /* On mobile, full-width at bottom */
-    bottom: max(12px, env(safe-area-inset-bottom, 12px));
+    bottom: max(62px, calc(52px + env(safe-area-inset-bottom, 8px)));
     right: 8px;
     left: auto;
     max-width: calc(100vw - 16px);
