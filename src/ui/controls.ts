@@ -134,6 +134,7 @@ export function createInfoPanel(container: HTMLElement): {
     const illumPct = (info.illumination * 100).toFixed(1);
 
     container.innerHTML = `
+      <button class="info-close" aria-label="Close">&times;</button>
       <div class="info-content">
         <div class="info-title">📍 ${lat.toFixed(2)}°, ${lon.toFixed(2)}°</div>
         <div>Type: <strong>${info.type}</strong></div>
@@ -144,6 +145,10 @@ export function createInfoPanel(container: HTMLElement): {
       </div>
     `;
     container.style.display = "block";
+    container.querySelector(".info-close")!.addEventListener("click", (e) => {
+      e.stopPropagation();
+      hide();
+    });
   }
 
   function hide(): void {
