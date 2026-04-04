@@ -15,8 +15,8 @@ export function createInfoOverlay(infoBtn: HTMLElement, panel: HTMLElement): {
   panel.innerHTML = `
     <div class="panel-legend">
       <div class="legend-row"><span class="swatch swatch-lower"></span> Horizontal crescent ("wet moon")</div>
-      <div class="legend-row"><span class="swatch swatch-side"></span> Side crescent (Moon visible)</div>
-      <div class="legend-row"><span class="swatch swatch-fade"></span> Opacity = how horizontal</div>
+      <div class="legend-row"><span class="swatch swatch-fade"></span> Brighter = more horizontal</div>
+      <div class="legend-hint">Zone marks where the crescent appears as a bowl — on the Sun-Earth-Moon plane during twilight.</div>
     </div>
     <div class="panel-point" style="display:none"></div>
   `;

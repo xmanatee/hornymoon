@@ -3,8 +3,8 @@ import { TILT_THRESHOLD_RAD } from "../astro/crescent";
 import type { GridResult } from "../types";
 
 const TILT_THRESHOLD_SIN = Math.sin(TILT_THRESHOLD_RAD);
-const MAX_ALPHA = 200;
-const MOON_ALT_FULL_OPACITY = 5 * (Math.PI / 180);
+const MAX_ALPHA = 220;
+const MOON_ALT_FULL_OPACITY = 12 * (Math.PI / 180);
 
 /**
  * Custom Leaflet layer that renders crescent zones on a canvas overlay.
@@ -124,17 +124,17 @@ export class CrescentCanvasLayer extends L.Layer {
           if (cell.type === "upper") {
             r = 255; g = 180; b = 50;
           } else {
-            r = 80; g = 160; b = 255;
+            r = 80; g = 170; b = 255;
           }
+          // Squared falloff for sharper edges
           const strength = 1 - cell.verticality / TILT_THRESHOLD_SIN;
+          const s2 = strength * strength;
           alpha = Math.floor(
-            Math.max(0, Math.min(255, strength * moonAltFactor * MAX_ALPHA))
+            Math.max(0, Math.min(255, s2 * moonAltFactor * MAX_ALPHA))
           );
         } else {
-          r = 180; g = 180; b = 180;
-          alpha = Math.floor(
-            Math.max(0, Math.min(255, moonAltFactor * 35))
-          );
+          // Side crescents: skip entirely for a clean focused zone
+          continue;
         }
 
         if (alpha <= 0) continue;

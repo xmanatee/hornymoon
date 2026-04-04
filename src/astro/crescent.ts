@@ -35,18 +35,18 @@ const MAX_ILLUMINATION = 0.5;
 /** Min illumination to be visible at all */
 const MIN_ILLUMINATION = 0.005;
 
-/** Max sun altitude (radians) for crescent to be visible — civil twilight */
-const MAX_SUN_ALT = 6 * (Math.PI / 180);
+/** Max sun altitude (radians) — sun must be near or below horizon */
+const MAX_SUN_ALT = -1 * (Math.PI / 180);
 
-/** Min moon altitude (radians) — slightly below horizon for refraction */
-const MIN_MOON_ALT = -1 * (Math.PI / 180);
+/** Min moon altitude (radians) — must be above horizon */
+const MIN_MOON_ALT = 0;
 
 /**
  * Threshold angle (radians) for classifying crescent as "upper" or "lower".
  * |sin(tilt)| < sin(threshold) means the crescent is near-horizontal.
- * 30 degrees captures the visually noticeable effect.
+ * 15° is a focused band around the Sun-Earth-Moon plane.
  */
-export const TILT_THRESHOLD_RAD = 30 * (Math.PI / 180);
+export const TILT_THRESHOLD_RAD = 15 * (Math.PI / 180);
 
 /**
  * Compute crescent information for a single observer location.
